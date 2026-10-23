@@ -22,3 +22,6 @@ export type { TabItem } from './Tabs'
 
 export { ToastProvider } from './ToastProvider'
 export { useToast } from './useToast'
+
+export { CopyButton } from './CopyButton'
+export type { CopyButtonProps, CopyButtonVariant } from './CopyButton'

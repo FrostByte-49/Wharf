@@ -34,6 +34,7 @@ import { Badge, Button, Card } from '../components/ui';
 import api from '../lib/api';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useToast } from '../components/ui/useToast';
+import { getPopularExample } from '../data/popularExamplesData';
 
 interface ChangelogData {
   content: string;
@@ -276,9 +277,9 @@ export const ChangelogPage = () => {
       }
 
       analytics.track('Changelog Generated', { repoUrl, format: options.format, commitCount: options.commitCount });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to generate changelog:', error);
-      const errMsg = error.message || 'Changelog Generation Failed. Please Try Again.';
+      const errMsg = (error as Error)?.message || 'Changelog Generation Failed. Please Try Again.';
       const titleCasedMsg = errMsg.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
       showToast(titleCasedMsg, 'error');
     } finally {
@@ -774,6 +775,19 @@ export const ChangelogPage = () => {
                       onAnalyze={handleAnalyzeRepo}
                       isLoading={isAnalyzing}
                       apiError={apiError}
+                      onSelectExample={(exampleName) => {
+                        const popular = getPopularExample(exampleName);
+                        if (popular) {
+                          setRepoUrl(popular.repoData.url);
+                          setChangelogData({
+                            content: popular.changelogData.content,
+                            stats: popular.changelogData.stats,
+                          });
+                          setGeneratedContent(popular.changelogData.content);
+                          setCurrentStep(3);
+                          showToast(`Loaded sample changelog for ${popular.name}!`, 'success');
+                        }
+                      }}
                     />
                   </div>
                 )}

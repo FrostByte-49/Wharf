@@ -1,7 +1,8 @@
-import { Link2, ArrowRight, Zap, CheckCircle, AlertCircle, GitBranch } from 'lucide-react';
+import { Link2, ArrowRight, Zap, CheckCircle, AlertCircle, GitBranch, Star } from 'lucide-react';
 import { FaGithub } from 'react-icons/fa';
 import { Input, Button, Card } from '../ui';
 import { useState } from 'react';
+import { getPopularExample } from '../../data/popularExamplesData';
 
 interface ChangelogInputProps {
   repoUrl: string;
@@ -9,6 +10,7 @@ interface ChangelogInputProps {
   onAnalyze: () => void;
   isLoading: boolean;
   apiError?: string | null;
+  onSelectExample?: (exampleName: string) => void;
 }
 
 export const ChangelogInput = ({
@@ -17,6 +19,7 @@ export const ChangelogInput = ({
   onAnalyze,
   isLoading,
   apiError,
+  onSelectExample,
 }: ChangelogInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -83,6 +86,15 @@ export const ChangelogInput = ({
   };
 
   const handleExampleClick = (example: string) => {
+    const popular = getPopularExample(example);
+    if (popular) {
+      setRepoUrl(popular.repoData.url);
+      setTouched(true);
+      if (onSelectExample) {
+        onSelectExample(example);
+        return;
+      }
+    }
     const url = `https://github.com/${example}`;
     setRepoUrl(url);
     setTouched(true);
@@ -220,6 +232,12 @@ export const ChangelogInput = ({
                       <p className="font-mono text-[10px] text-wharf-text-tertiary mt-0.5 capitalize">
                         {example.description}
                       </p>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                      <Star className="w-3 h-3 text-wharf-yellow-dark fill-wharf-yellow" />
+                      <span className="font-mono text-[10px] text-wharf-text-tertiary">
+                        {example.stars}
+                      </span>
                     </div>
                   </div>
                   <div className="absolute inset-0 border-2 border-transparent group-hover:border-wharf-cyan/20 rounded-xl transition-colors pointer-events-none" />
