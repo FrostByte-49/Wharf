@@ -1,4 +1,4 @@
-# Developer Testing Recipes & Manual QA Walkthrough Guide ðŸ§ª
+# Developer Testing Recipes & Manual QA Walkthrough Guide 
 
 This guide provides step-by-step testing recipes for contributors to test frontend components, Cloudflare Worker backend routes, and authentication flows locally without requiring live GitHub OAuth credentials or paid third-party LLM API keys.
 
