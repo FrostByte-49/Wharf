@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { FaGithub } from 'react-icons/fa';
 import { Input, Button, Card } from '../ui';
+import { getPopularExample } from '../../data/popularExamplesData';
 
 interface HealthRepoInputProps {
   repoUrl: string;
@@ -20,6 +21,7 @@ interface HealthRepoInputProps {
   recentRepos?: string[];
   onRecentSelect?: (url: string) => void;
   onClearRecent?: () => void;
+  onSelectExample?: (exampleName: string) => void;
 }
 
 export const HealthRepoInput = ({
@@ -29,6 +31,7 @@ export const HealthRepoInput = ({
   isLoading,
   apiError,
   recentRepos = [],
+  onSelectExample,
 }: HealthRepoInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [, setShowRecent] = useState(false);
@@ -104,6 +107,15 @@ export const HealthRepoInput = ({
   };
 
   const handleExampleClick = (example: string) => {
+    const popular = getPopularExample(example);
+    if (popular) {
+      setRepoUrl(popular.repoData.url);
+      setTouched(true);
+      if (onSelectExample) {
+        onSelectExample(example);
+        return;
+      }
+    }
     const url = `https://github.com/${example}`;
     setRepoUrl(url);
     setTouched(true);

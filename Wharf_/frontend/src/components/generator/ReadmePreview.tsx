@@ -6,7 +6,6 @@ import {
   Split,
   Maximize2,
   Minimize2,
-  Copy,
   Download,
   RefreshCw,
   Check,
@@ -20,6 +19,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { CopyButton } from '../ui/CopyButton';
 import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
 import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
@@ -61,7 +61,6 @@ export const ReadmePreview = ({
   const [content, setContent] = useState(initialContent);
   const [viewMode, setViewMode] = useState<ViewMode>('preview');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [mermaidRendered, setMermaidRendered] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
   const previewRef = useRef<HTMLDivElement>(null);
@@ -265,12 +264,6 @@ export const ReadmePreview = ({
     onContentChange?.(newContent);
   };
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleDownload = () => {
     const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -349,23 +342,12 @@ export const ReadmePreview = ({
       const codeString = String(children).replace(/\n$/, '');
       return (
         <div className="relative group my-4">
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              navigator.clipboard.writeText(codeString);
-              const btn = e.currentTarget;
-              const originalHTML = btn.innerHTML;
-              btn.innerHTML =
-                '<svg class="w-4 h-4 text-wharf-success" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-              setTimeout(() => {
-                btn.innerHTML = originalHTML;
-              }, 2000);
-            }}
-            className="absolute top-2 right-2 p-1.5 bg-wharf-surface-primary border border-wharf-border-primary rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-wharf-surface-secondary cursor-pointer"
-            title="Copy code"
-          >
-            <Copy className="w-4 h-4 text-wharf-text-secondary" />
-          </button>
+          <CopyButton
+            content={codeString}
+            variant="codeblock"
+            tooltipPosition="left"
+            className="absolute top-2 right-2 z-10"
+          />
           <SyntaxHighlighter
             language={language || 'text'}
             PreTag="div"
@@ -558,19 +540,12 @@ export const ReadmePreview = ({
             <div className="w-px h-6 mx-2 bg-wharf-border-primary" />
 
             {/* Action Buttons */}
-            <button
-              onClick={handleCopy}
-              className="p-1.5 border-2 border-wharf-border-primary bg-wharf-surface-primary hover:bg-wharf-surface-secondary transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              {copied ? (
-                <Check className="w-4 h-4 text-wharf-green" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-              <span className="font-mono text-[10px] font-bold hidden sm:inline">
-                {copied ? 'Copied!' : 'Copy'}
-              </span>
-            </button>
+            <CopyButton
+              content={content}
+              variant="toolbar"
+              label="Copy"
+              tooltipPosition="top"
+            />
 
             <button
               onClick={handleDownload}
