@@ -80,7 +80,6 @@ export class ChangelogController {
           cacheHit: true,
           totalDurationMs: Date.now() - reqStart,
         });
-
         c.header('Content-Type', 'text/event-stream');
         c.header('Cache-Control', 'no-cache');
         c.header('Connection', 'keep-alive');
@@ -88,13 +87,29 @@ export class ChangelogController {
           await streamStr.write(`data: ${JSON.stringify({ text: cached })}\n\n`);
           await streamStr.write('data: [DONE]\n\n');
         });
-      }
+      }     
+const result = await new ChangelogService(
+  new GithubService(),
+  new AiService(c.env.DATABASE_URL),
+  c.env.DATABASE_URL
+).generateChangelog(repoUrl, options, githubToken);
 
-      const { stream: aiStream, provider } = await new ChangelogService(new GithubService(), new AiService(c.env.DATABASE_URL), c.env.DATABASE_URL).generateChangelog(
-        repoUrl,
-        options,
-        githubToken
-      );
+if ('empty' in result) {
+  await saveRequestLog({
+    route: c.req.path,
+    method: c.req.method,
+    feature: 'CHANGELOG',
+    statusCode: 200,
+    cacheHit: false,
+    targetRepo: extractRepoName(repoUrl),
+    totalDurationMs: Date.now() - reqStart,
+  });
+
+  return c.json(result, 200);
+}
+
+const { stream: aiStream, provider } = result;
+
 
       c.header('Content-Type', 'text/event-stream');
       c.header('Cache-Control', 'no-cache');
