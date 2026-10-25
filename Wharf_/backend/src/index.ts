@@ -47,7 +47,14 @@ app.use('*', async (c, next) => {
     origin: allowedOrigins,
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-BYOK-Gemini',
+      'X-BYOK-OpenAI',
+      'X-BYOK-Groq',
+      'X-BYOK-Anthropic',
+    ],
   });
   return corsMiddleware(c, next);
 });

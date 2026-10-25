@@ -8,6 +8,7 @@ interface ApiKeyModalProps {
   onSave: (provider: string, key: string) => Promise<void>;
   provider: string | null;
   providerName: string;
+  ephemeral?: boolean;
 }
 
 export const ApiKeyModal = ({
@@ -16,6 +17,7 @@ export const ApiKeyModal = ({
   onSave,
   provider,
   providerName,
+  ephemeral = false,
 }: ApiKeyModalProps) => {
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -52,7 +54,9 @@ export const ApiKeyModal = ({
     <Modal isOpen={isOpen} onClose={handleClose} title={`Add ${providerName} API Key`}>
       <div className="space-y-4">
         <p className="font-mono text-sm text-wharf-text-secondary capitalize">
-          Enter your {providerName} API key. Your key will be encrypted before storage.
+          {ephemeral
+            ? `Enter your ${providerName} API key. It stays in this tab's session storage and is sent only with generation requests.`
+            : `Enter your ${providerName} API key. Your key will be encrypted before storage.`}
         </p>
 
         <div className="space-y-2">
@@ -111,7 +115,11 @@ export const ApiKeyModal = ({
         <div className="p-3 mt-6 border-2 border-wharf-border-secondary bg-wharf-surface-secondary rounded-2xl">
           <div className="flex items-start gap-2 font-mono text-xs text-wharf-text-secondary capitalize">
             <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-            <span>Your key is encrypted with AES-256-GCM. We never store keys in plaintext...</span>
+            <span>
+              {ephemeral
+                ? 'This key is never saved to the Wharf database and clears when the browser session ends.'
+                : 'Your key is encrypted with AES-256-GCM. We never store keys in plaintext...'}
+            </span>
           </div>
         </div>
       </div>

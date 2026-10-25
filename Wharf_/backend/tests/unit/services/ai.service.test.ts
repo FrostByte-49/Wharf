@@ -34,6 +34,14 @@ vi.mock('@google/genai', () => ({
   })
 }));
 
+const mockRepoContext = {
+  meta: { name: 'repo', owner: 'owner', description: 'desc', language: 'ts', topics: [], stars: 10, license: 'MIT', defaultBranch: 'main' },
+  frameworks: [],
+  commands: { install: '', run: '' },
+  treePreview: '',
+  keyFiles: {},
+};
+
 describe('AiService', () => {
   let aiService: AiService;
   
@@ -73,6 +81,38 @@ describe('AiService', () => {
       expect(result.text).toBe('chunk1chunk2');
       expect(chunks).toBe('chunk1chunk2');
       expect(GoogleGenAI).toHaveBeenCalledWith({ apiKey: 'sys-gem' });
+    });
+
+    it('uses an ephemeral key before consulting the database key router', async () => {
+      const result = await aiService.generateReadmeStream(
+        mockRepoContext as any,
+        'technical',
+        [],
+        undefined,
+        undefined,
+        { provider: 'GEMINI', key: 'request-gemini-key' },
+      );
+
+      expect(result.provider).toBe('GEMINI');
+      expect(GoogleGenAI).toHaveBeenCalledWith({ apiKey: 'request-gemini-key' });
+      expect(KeyRouterService.prototype.getBestAvailableKey).not.toHaveBeenCalled();
+    });
+
+    it('does not mark request-scoped keys exhausted in the database', async () => {
+      (GoogleGenAI as Mock).mockImplementationOnce(function() {
+        return { models: { generateContentStream: vi.fn().mockRejectedValue({ status: 429 }) } };
+      });
+
+      await expect(aiService.generateReadmeStream(
+        mockRepoContext as any,
+        'technical',
+        [],
+        undefined,
+        undefined,
+        { provider: 'GEMINI', key: 'bad-request-key' },
+      )).rejects.toMatchObject({ status: 429 });
+
+      expect(KeyRouterService.prototype.markAsExhausted).not.toHaveBeenCalled();
     });
 
     it('should fallback to NEXT_AVAILABLE if exhaustion error occurs', async () => {

@@ -9,6 +9,7 @@ import { getPrisma } from '../db';
 import { recordDailyGeneration } from '../utils/dailyStats';
 import { loggerService, saveRequestLog } from '../utils/logger';
 import { Bindings } from '../index';
+import { readEphemeralByok, type EphemeralByokKey } from '../utils/ephemeralByok';
 
 type AppContext = Context<{ Bindings: Bindings; Variables: { user: any; contextStore: any } }>;
 
@@ -18,6 +19,12 @@ export const generateReadme = async (c: AppContext) => {
   const { repoUrl, tone, sections } = body;
   const user = c.get('user');
   const userId = user?.userId;
+  let ephemeralKey: EphemeralByokKey | undefined;
+  try {
+    ephemeralKey = readEphemeralByok(c) ?? undefined;
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Invalid BYOK header' }, 400);
+  }
 
   if (!repoUrl || !tone || !sections || !Array.isArray(sections)) {
     return c.json({ success: false, error: 'repoUrl, tone, and sections are required fields' }, 400);
@@ -107,7 +114,8 @@ export const generateReadme = async (c: AppContext) => {
         userId,
         async (chunk) => {
           await streamStr.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
-        }
+        },
+        ephemeralKey
       );
       loggerService.stepEnd('generation.ai.completed', 'AI Generation Completed', aiStart, {
         repository: `${owner}/${repo}`,
