@@ -1,5 +1,6 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { useAuthStore } from '../stores/authStore';
+import { getEphemeralByokHeaders } from '../lib/ephemeralByok';
 import { PageWrapper } from '../components/layout';
 import { Badge, Button, Card } from '../components/ui';
 import {
@@ -399,7 +400,9 @@ export const GeneratorPage = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${useAuthStore.getState().token || ''}`,
+            ...(useAuthStore.getState().token
+              ? { Authorization: `Bearer ${useAuthStore.getState().token}` }
+              : getEphemeralByokHeaders()),
           },
           body: JSON.stringify({
             repoUrl: selectedRepo.url,

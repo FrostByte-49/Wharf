@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildReadmePrompt } from '../utils/promptBuilder';
 import { buildProfilePrompt, ProfileData, ProfileOptions } from '../utils/profilePromptBuilder';
 import { RepoContext } from './repo.service';
+import type { EphemeralByokKey } from '../utils/ephemeralByok';
 
 const SYSTEM_PROMPT = 'You are an expert technical writer and developer. You MUST follow every single instruction in the prompt strictly. Do not skip any requested sections, steps, or details. Provide extremely detailed, exhaustive, and rich content. Expand fully on all points without abbreviating or summarizing excessively. Your output must be highly verbose and comprehensive, guaranteeing high-quality content.';
 
@@ -30,10 +31,13 @@ export class AiService {
     tone: 'technical' | 'recruiter' | 'beginner',
     sections: string[],
     userId?: string,
-    onChunk?: (text: string) => void
+    onChunk?: (text: string) => void,
+    ephemeralKey?: EphemeralByokKey
   ): Promise<{ text: string; provider: string }> {
-    
-    const keyInfo = await this.keyRouter.getBestAvailableKey(userId, ['GEMINI', 'OPENAI', 'ANTHROPIC', 'DEEPSEEK', 'GROK']);
+
+    const keyInfo = ephemeralKey
+      ? { id: 'request-ephemeral', key: ephemeralKey.key, provider: ephemeralKey.provider, isSystem: false }
+      : await this.keyRouter.getBestAvailableKey(userId, ['GEMINI', 'OPENAI', 'ANTHROPIC', 'DEEPSEEK', 'GROK']);
 
     if (!keyInfo) {
       throw new Error(
@@ -76,6 +80,23 @@ export class AiService {
             model: 'gpt-4o-mini',
             messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: prompt }],
             stream: true,
+          });
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content || '';
+            fullText += text;
+            if (onChunk) onChunk(text);
+          }
+          break;
+        }
+
+        case 'GROQ': {
+          const groq = new Groq({ apiKey: keyInfo.key });
+          const stream = await groq.chat.completions.create({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: truncateForGroq(prompt) }],
+            stream: true,
+            max_tokens: 4000,
+            temperature: 0.7,
           });
           for await (const chunk of stream) {
             const text = chunk.choices[0]?.delta?.content || '';
@@ -161,6 +182,10 @@ export class AiService {
         error.message?.includes('Overloaded') ||
         error.message?.includes('Access denied')
       ) {
+        if (ephemeralKey) {
+          loggerService.providerFailed(keyInfo.provider.toUpperCase(), error);
+          throw error;
+        }
         loggerService.providerFallback(keyInfo.provider.toUpperCase(), 'NEXT_AVAILABLE', error);
         await this.keyRouter.markAsExhausted(keyInfo.id, keyInfo.isSystem);
         return this.generateReadmeStream(context, tone, sections, userId, onChunk);

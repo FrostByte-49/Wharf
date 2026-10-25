@@ -1,5 +1,6 @@
 import { useAuthStore } from '../stores/authStore';
 import axios from 'axios';
+import { getEphemeralByokHeaders } from './ephemeralByok';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8787/api',
@@ -10,6 +11,10 @@ api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
+  } else {
+    Object.entries(getEphemeralByokHeaders()).forEach(([header, value]) => {
+      config.headers.set(header, value);
+    });
   }
   return config;
 });

@@ -6,6 +6,15 @@ import { Key, Activity, Lock } from 'lucide-react';
 import { SiOpenai, SiAnthropic, SiX, SiGo } from 'react-icons/si';
 import { FaGoogle } from 'react-icons/fa';
 import { GiWhaleTail } from 'react-icons/gi';
+import { useAuthStore } from '../../stores/authStore';
+import {
+  EPHEMERAL_BYOK_PROVIDERS,
+  getEphemeralByokKey,
+  isEphemeralByokEnabled,
+  removeEphemeralByokKey,
+  setEphemeralByokEnabled,
+  setEphemeralByokKey,
+} from '../../lib/ephemeralByok';
 
 interface ApiKey {
   id: string;
@@ -37,13 +46,39 @@ const PROVIDERS = [
 ];
 
 export const ApiKeysTab = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [ephemeralMode, setEphemeralMode] = useState(() => isEphemeralByokEnabled());
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  const loadEphemeralKeys = useCallback(() => {
+    setApiKeys(EPHEMERAL_BYOK_PROVIDERS.flatMap((provider) => {
+      const key = getEphemeralByokKey(provider);
+      if (!key) return [];
+      return [{
+        id: `ephemeral-${provider}`,
+        provider,
+        label: `${provider} session key`,
+        isVerified: true,
+        hasKey: true,
+        keyPrefix: `${key.slice(0, 4)}••••${key.slice(-4)}`,
+        isActive: true,
+        usageCount: 0,
+        lastUsed: null,
+      }];
+    }));
+  }, []);
+
   const fetchApiKeys = useCallback(async () => {
+    if (!isAuthenticated) {
+      if (ephemeralMode) loadEphemeralKeys();
+      else setApiKeys([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const response = await api.get('/user/apikeys');
@@ -53,7 +88,7 @@ export const ApiKeysTab = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [ephemeralMode, isAuthenticated, loadEphemeralKeys, showToast]);
 
   useEffect(() => {
     fetchApiKeys();
@@ -82,6 +117,13 @@ export const ApiKeysTab = () => {
     if (!key) return;
 
     const providerName = getProviderName(providerId);
+
+    if (!isAuthenticated && ephemeralMode) {
+      removeEphemeralByokKey(providerId);
+      loadEphemeralKeys();
+      showToast(`${providerName} Session Key Removed`, 'success');
+      return;
+    }
     
     // Optimistic Update
     const previousKeys = [...apiKeys];
@@ -100,6 +142,14 @@ export const ApiKeysTab = () => {
     const providerName = getProviderName(providerId);
 
     try {
+      if (!isAuthenticated && ephemeralMode) {
+        setEphemeralByokKey(providerId, key);
+        loadEphemeralKeys();
+        showToast(`${providerName} Key Saved For This Browser Session`, 'success');
+        setModalOpen(false);
+        setEditingProvider(null);
+        return;
+      }
       await api.post('/user/apikey', { provider: providerId, key });
       showToast(`${providerName} API Key Saved Successfully!`, 'success');
       setModalOpen(false);
@@ -191,14 +241,46 @@ export const ApiKeysTab = () => {
             <h3 className="font-display font-black text-lg tracking-tighter">API Keys (BYOK)</h3>
           </div>
           <p className="font-mono text-sm text-wharf-text-secondary mt-1 capitalize">
-            Manage your API keys for AI providers. Keys are encrypted with AES-256.
+            {ephemeralMode && !isAuthenticated
+              ? 'Session keys stay in this browser tab and are never saved to the database.'
+              : 'Manage your API keys for AI providers. Saved account keys are encrypted with AES-256.'}
           </p>
         </div>
       </div>
 
+      {!isAuthenticated && (
+        <label className="flex items-start gap-3 p-4 border-2 border-wharf-border-secondary bg-wharf-surface-secondary rounded-xl cursor-pointer">
+          <input
+            type="checkbox"
+            checked={ephemeralMode}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              setEphemeralMode(enabled);
+              setEphemeralByokEnabled(enabled);
+              if (enabled) loadEphemeralKeys();
+              else setApiKeys([]);
+            }}
+            className="mt-1"
+          />
+          <span>
+            <strong className="block font-mono text-sm text-wharf-text-primary">
+              Use API keys in this browser session only (Ephemeral)
+            </strong>
+            <span className="block mt-1 font-mono text-xs text-wharf-text-secondary">
+              Keys stay in sessionStorage, are sent only in BYOK request headers, never reach the Wharf database, and clear when this browser session ends.
+            </span>
+          </span>
+        </label>
+      )}
+
       {/* Provider List */}
       <div className="space-y-5">
-        {PROVIDERS.map((provider) => {
+        {(!isAuthenticated
+          ? (ephemeralMode
+              ? PROVIDERS.filter((provider) => EPHEMERAL_BYOK_PROVIDERS.includes(provider.id as typeof EPHEMERAL_BYOK_PROVIDERS[number]))
+              : [])
+          : PROVIDERS
+        ).map((provider) => {
           const key = getKeyForProvider(provider.id);
           const hasKey = !!key;
           const isVerified = key?.isVerified || false;
@@ -246,11 +328,12 @@ export const ApiKeysTab = () => {
         <div className="flex items-start">
           <div>
             <p className="flex gap-2 font-mono text-sm font-bold text-wharf-text-primary mb-1">
-              <Lock className="w-4 h-4" /> Secure & Encrypted
+              <Lock className="w-4 h-4" /> {ephemeralMode && !isAuthenticated ? 'Session-only BYOK' : 'Secure & Encrypted'}
             </p>
             <p className="font-mono text-xs text-wharf-text-secondary capitalize">
-              Your API keys are encrypted with AES-256-GCM. If a key is invalid or missing, WHARF
-              automatically falls back to the free tier.
+              {ephemeralMode && !isAuthenticated
+                ? 'Ephemeral keys are not verified or persisted by Wharf. Invalid keys fail only that request and never modify the shared key pool.'
+                : 'Your API keys are encrypted with AES-256-GCM. If a key is invalid or missing, WHARF automatically falls back to the free tier.'}
             </p>
           </div>
         </div>
@@ -266,6 +349,7 @@ export const ApiKeysTab = () => {
         onSave={handleSaveKey}
         provider={editingProvider}
         providerName={editingProvider ? getProviderName(editingProvider) : ''}
+        ephemeral={ephemeralMode && !isAuthenticated}
       />
     </div>
   );

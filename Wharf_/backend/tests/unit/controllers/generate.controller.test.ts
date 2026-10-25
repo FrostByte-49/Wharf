@@ -106,6 +106,31 @@ describe('GenerateController', () => {
       expect(prismaObj.generation.create).toHaveBeenCalled();
       expect(prismaObj.$executeRaw).toHaveBeenCalled();
     });
+
+    it('passes an ephemeral header override without reading a user key from the database', async () => {
+      const c = createMockContext({
+        body: { repoUrl: 'https://github.com/foo/bar', tone: 'tech', sections: ['s1'] },
+        headers: { 'X-BYOK-OpenAI': 'request-only-secret' },
+      }, mockEnv);
+
+      (cacheService.getReadme as Mock).mockResolvedValue(null);
+      (RepoService.prototype.analyzeRepo as Mock).mockResolvedValue({ meta: { name: 'repo' } });
+      (AiService.prototype.generateReadmeStream as Mock).mockResolvedValue({ text: 'generated', provider: 'OPENAI' });
+
+      await generateReadme(c);
+
+      expect(AiService.prototype.generateReadmeStream).toHaveBeenCalledWith(
+        expect.anything(),
+        'tech',
+        ['s1'],
+        undefined,
+        expect.any(Function),
+        { provider: 'OPENAI', key: 'request-only-secret' },
+      );
+      expect(prismaObj.user.findUnique).not.toHaveBeenCalled();
+      expect(prismaObj.repository.upsert).not.toHaveBeenCalled();
+      expect(prismaObj.generation.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('History endpoints', () => {
