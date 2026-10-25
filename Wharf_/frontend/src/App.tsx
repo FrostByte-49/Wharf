@@ -3,6 +3,7 @@ import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Header, Footer, BottomNav } from './components/layout';
 import { ToastProvider, useToast } from './components/ui';
 import { usePageViewTracking } from './hooks/useAnalytics';
+import { useAuthStore } from './stores/authStore';
 
 const HomePage = React.lazy(() =>
   import('./pages/HomePage').then((m) => ({ default: m.HomePage }))
@@ -44,21 +45,58 @@ const DocsPage = React.lazy(() =>
   import('./pages/DocsPage').then((m) => ({ default: m.DocsPage }))
 );
 
+
 function GlobalToastListener() {
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   React.useEffect(() => {
     const handleRateLimit = (e: Event) => {
       const customEvent = e as CustomEvent;
-      showToast(customEvent.detail?.message || 'Too Many Requests', 'error');
+
+      showToast(
+        customEvent.detail?.message || 'Too Many Requests',
+        'error'
+      );
+    };
+
+    const handleAuthExpired = () => {
+      const { isAuthenticated, logout } = useAuthStore.getState();
+
+      // Avoid repeated logout notifications.
+      if (!isAuthenticated) return;
+
+      logout();
+
+      showToast(
+        'Session expired. Please sign in again.',
+        'error'
+      );
+
+      navigate('/', { replace: true });
+    };
+
+    const handleServerError = () => {
+      showToast(
+        'Unable to connect to server. Please try again.',
+        'error'
+      );
     };
 
     window.addEventListener('api:rate-limit', handleRateLimit);
-    return () => window.removeEventListener('api:rate-limit', handleRateLimit);
-  }, [showToast]);
+    window.addEventListener('auth:expired', handleAuthExpired);
+    window.addEventListener('api:server-error', handleServerError);
+
+    return () => {
+      window.removeEventListener('api:rate-limit', handleRateLimit);
+      window.removeEventListener('auth:expired', handleAuthExpired);
+      window.removeEventListener('api:server-error', handleServerError);
+    };
+  }, [showToast, navigate]);
 
   return null;
 }
+
 
 function App() {
   usePageViewTracking();

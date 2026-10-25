@@ -7,29 +7,47 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   config.withCredentials = true;
+
   const token = useAuthStore.getState().token;
+
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
+
   return config;
 });
 
-// Handle Global 401 Unauthorized Errors (e.g. JWT Expired)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Dispatch Global Event So The UI Can Toast And Redirect Cleanly
+    if (error.response?.status === 401) {
       window.dispatchEvent(new CustomEvent('auth:expired'));
-    }
-    if (error.response && error.response.status === 429) {
+    } else if (error.response?.status === 429) {
       const defaultMsg = 'Too Many Requests';
-      let message = error.response.data?.error || error.response.data?.message || defaultMsg;
-      
-      // Convert Message To Title Case
-      message = message.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+      let message =
+        error.response.data?.error ||
+        error.response.data?.message ||
+        defaultMsg;
 
-      window.dispatchEvent(new CustomEvent('api:rate-limit', { detail: { message } }));
+      message = message
+        .split(' ')
+        .map(
+          (word: string) =>
+            word.charAt(0).toUpperCase() +
+            word.slice(1).toLowerCase()
+        )
+        .join(' ');
+
+      window.dispatchEvent(
+        new CustomEvent('api:rate-limit', {
+          detail: { message },
+        })
+      );
+    } else if (
+      !error.response ||
+      error.response.status >= 500
+    ) {
+      window.dispatchEvent(new CustomEvent('api:server-error'));
     }
 
     return Promise.reject(error);
