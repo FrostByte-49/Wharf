@@ -39,18 +39,23 @@ app.use('*', async (c, next) => {
 // Global Middleware
 app.use('*', logger());
 app.use('*', secureHeaders());
-app.use('*', async (c, next) => {
-  const allowedOrigins = ['http://localhost:5173', 'https://trywharf.vercel.app'];
-  if (c.env.FRONTEND_URL) allowedOrigins.push(c.env.FRONTEND_URL);
 
-  const corsMiddleware = cors({
-    origin: allowedOrigins,
-    credentials: true,
-    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-  });
-  return corsMiddleware(c, next);
+// Built once at module load and reused for every request. FRONTEND_URL is a
+// per-request binding, so the origin check reads it from the context.
+const STATIC_ALLOWED_ORIGINS = ['http://localhost:5173', 'https://trywharf.vercel.app'];
+
+const corsMiddleware = cors({
+  origin: (origin, c) => {
+    if (STATIC_ALLOWED_ORIGINS.includes(origin)) return origin;
+    const frontendUrl = c.env?.FRONTEND_URL;
+    return frontendUrl && origin === frontendUrl ? origin : null;
+  },
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
 });
+
+app.use('*', corsMiddleware);
 
 import { authRoutes } from './routes/auth.routes';
 import { healthRoutes } from './routes/health.routes';
