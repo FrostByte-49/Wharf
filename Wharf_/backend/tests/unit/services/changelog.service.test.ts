@@ -97,7 +97,11 @@ describe('ChangelogService', () => {
         groupByType: true 
       });
       expect(mockAiService.generateChangelogStream).toHaveBeenCalled();
-      expect(res.provider).toBe('GEMINI');
+      expect('empty' in res).toBe(false);
+
+if (!('empty' in res)) {
+  expect(res.provider).toBe('GEMINI');
+}
     });
   });
 

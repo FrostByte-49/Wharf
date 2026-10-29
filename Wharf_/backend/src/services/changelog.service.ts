@@ -80,24 +80,37 @@ export class ChangelogService {
     return stats;
   }
 
-  async generateChangelog(
-    repoUrl: string,
-    options: ChangelogOptions,
-    githubToken?: string
-  ): Promise<{ stream: AsyncGenerator<string>; provider: string }> {
-    const gh = githubToken ? new GithubService({ token: githubToken }) : this.githubService;
-    const { owner, repo } = this.extractOwnerRepo(repoUrl);
+async generateChangelog(
+  repoUrl: string,
+  options: ChangelogOptions,
+  githubToken?: string
+): Promise<
+  | { empty: true; message: string }
+  | { stream: AsyncGenerator<string>; provider: string }
+> {
+  const gh = githubToken ? new GithubService({ token: githubToken }) : this.githubService;
+  const { owner, repo } = this.extractOwnerRepo(repoUrl);
 
-    // Fetch Only The Requested Number Of Commits
-    const commitLimit = Math.min(options.commitCount || 100, 500);
-    const slicedCommits = await gh.getCommits(owner, repo, commitLimit);
+  const commitLimit = Math.min(options.commitCount || 100, 500);
+  const slicedCommits = await gh.getCommits(owner, repo, commitLimit);
 
-    const tags = options.includeTags ? await gh.getTags(owner, repo) : [];
-    const groups = this.groupCommits(slicedCommits);
-    const prompt = buildChangelogPrompt(groups, options, `${owner}/${repo}`, tags);
+  // Fetch tags even when tag inclusion is disabled, to detect a truly empty repository.
+  const repositoryTags = await gh.getTags(owner, repo);
 
-    return this.aiService.generateChangelogStream(prompt);
+  if (slicedCommits.length === 0 && repositoryTags.length === 0) {
+    return {
+      empty: true,
+      message: 'No commits or release tags found in this repository.',
+    };
   }
+
+  const tags = options.includeTags ? repositoryTags : [];
+  const groups = this.groupCommits(slicedCommits);
+  const prompt = buildChangelogPrompt(groups, options, `${owner}/${repo}`, tags);
+
+  return this.aiService.generateChangelogStream(prompt);
+}
+
 
   async getHistory(userId: string, page: number = 1, limit: number = 50) {
     limit = Math.min(limit, 200);

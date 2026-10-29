@@ -98,6 +98,7 @@ export const ChangelogPage = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+   const [emptyRepositoryMessage, setEmptyRepositoryMessage] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [currentStep, setCurrentStep] = useState(() =>
@@ -142,46 +143,108 @@ export const ChangelogPage = () => {
     }
   }, [isGenerating]);
 
-  const handleAnalyzeRepo = async () => {
-    if (!repoUrl) return;
+const handleAnalyzeRepo = async () => {
+  if (!repoUrl) return;
 
-    setApiError(null);
-    setIsAnalyzing(true);
-    try {
-      const statsRes = await api.post('/changelog/stats', { repoUrl });
-      const stats = statsRes.data.data;
+  setApiError(null);
+  setEmptyRepositoryMessage(null);
+  setIsAnalyzing(true);
 
-      setChangelogData((prev) => ({ content: prev?.content || '', stats }));
-      setCurrentStep(2);
-      analytics.track('Changelog Repo Analyzed', { repoUrl, totalCommits: stats.totalCommits });
+  try {
+    const statsRes = await api.post('/changelog/stats', { repoUrl });
+    const responseData = statsRes.data;
 
-      // Adjust Options If Max Commits Is Lower Than Current Selection
-      const max = Math.min(stats.totalCommits, 500);
-      if (options.commitCount > max) {
-        setOptions((prev) => ({ ...prev, commitCount: max }));
-      }
-    } catch (err) {
-      console.error('Failed to get stats:', err);
-      let errorMsg = 'Failed to analyze repository. Please check if it exists.';
-
-      // Type Guard To Safely Access Error Properties
-      if (err && typeof err === 'object' && 'response' in err) {
-        const errorResponse = err as { response?: { data?: { error?: string } } };
-        if (errorResponse.response?.data?.error) {
-          errorMsg = errorResponse.response.data.error;
-        }
-      }
-
-      if (errorMsg.includes('Not Found') || errorMsg.includes('docs.github.com')) {
-        errorMsg = 'Repository not found or requires authentication.';
-      }
-      setApiError(errorMsg);
-      const titleCasedMsg = errorMsg.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-      showToast(titleCasedMsg, 'error');
-    } finally {
-      setIsAnalyzing(false);
+    // Handle empty repository response
+    if (responseData.empty) {
+      setEmptyRepositoryMessage(
+        responseData.message ||
+          'No commits or release tags found in this repository.'
+      );
+      setChangelogData(null);
+      return;
     }
-  };
+
+    const stats = responseData.data;
+
+    // Handle repository with no commits and no tags
+    if (stats.totalCommits === 0 && stats.tags === 0) {
+      setEmptyRepositoryMessage(
+        'No commits or release tags found in this repository.'
+      );
+      setChangelogData(null);
+      return;
+    }
+
+    setChangelogData((prev) => ({
+      content: prev?.content || '',
+      stats,
+    }));
+
+    setCurrentStep(2);
+
+    analytics.track('Changelog Repo Analyzed', {
+      repoUrl,
+      totalCommits: stats.totalCommits,
+    });
+
+    // Adjust options to the available commit count
+    const max = Math.min(stats.totalCommits, 500);
+
+    if (options.commitCount > max) {
+      setOptions((prev) => ({
+        ...prev,
+        commitCount: max,
+      }));
+    }
+  } catch (err) {
+    console.error('Failed to get stats:', err);
+
+    let errorMsg =
+      'Failed to analyze repository. Please check if it exists.';
+
+    if (err && typeof err === 'object' && 'response' in err) {
+      const errorResponse = err as {
+        response?: {
+          data?: {
+            error?: string;
+            message?: string;
+          };
+        };
+      };
+
+      const responseError =
+        errorResponse.response?.data?.error ||
+        errorResponse.response?.data?.message;
+
+      if (responseError) {
+        errorMsg = responseError;
+      }
+    }
+
+    if (
+      errorMsg.includes('Not Found') ||
+      errorMsg.includes('docs.github.com')
+    ) {
+      errorMsg = 'Repository not found or requires authentication.';
+    }
+
+    setApiError(errorMsg);
+
+    const titleCasedMsg = errorMsg
+      .split(' ')
+      .map(
+        (word) =>
+          word.charAt(0).toUpperCase() +
+          word.slice(1).toLowerCase()
+      )
+      .join(' ');
+
+    showToast(titleCasedMsg, 'error');
+  } finally {
+    setIsAnalyzing(false);
+  }
+};
+
 
   const handleGenerateChangelog = async () => {
     if (!repoUrl) return;
@@ -756,27 +819,45 @@ export const ChangelogPage = () => {
 
             {/* Main Content Card */}
             <Card variant="hard" className="overflow-hidden mb-16">
-              <div className="px-2 py-4 sm:p-6 md:p-8">
-                {/* Step 1: Enter Repository */}
-                {currentStep === 1 && (
-                  <div className="space-y-6 animate-fadeInUp">
-                    <div className="text-center mb-8">
-                      <h3 className="font-display font-black text-2xl tracking-tighter">
-                        Enter Your Repository
-                      </h3>
-                      <p className="font-mono text-sm text-wharf-text-tertiary mt-1 capitalize">
-                        Paste a GitHub URL to generate a changelog from its commit history
-                      </p>
-                    </div>
-                    <ChangelogInput
-                      repoUrl={repoUrl}
-                      setRepoUrl={setRepoUrl}
-                      onAnalyze={handleAnalyzeRepo}
-                      isLoading={isAnalyzing}
-                      apiError={apiError}
-                    />
-                  </div>
-                )}
+              <div className="px-2 py-4 sm:p-6 md:p-8">                {/* Step 1: Enter Repository */}
+{currentStep === 1 && (
+  <div className="space-y-6 animate-fadeInUp">
+    <div className="text-center mb-8">
+      <h3 className="font-display font-black text-2xl tracking-tighter">
+        Enter Your Repository
+      </h3>
+      <p className="font-mono text-sm text-wharf-text-tertiary mt-1 capitalize">
+        Paste a GitHub URL to generate a changelog from its commit history
+      </p>
+    </div>
+
+    <ChangelogInput
+      repoUrl={repoUrl}
+      setRepoUrl={setRepoUrl}
+      onAnalyze={handleAnalyzeRepo}
+      isLoading={isAnalyzing}
+      apiError={apiError}
+    />
+
+    {emptyRepositoryMessage && (
+      <div
+        role="status"
+        className="mt-4 rounded-xl border-2 border-wharf-border-primary bg-wharf-surface-secondary p-5 text-center"
+      >
+        <CheckCircle className="mx-auto mb-3 h-8 w-8 text-wharf-cyan" />
+
+        <h4 className="font-display text-lg font-bold">
+          Empty Repository
+        </h4>
+
+        <p className="mt-2 font-mono text-sm text-wharf-text-secondary">
+          {emptyRepositoryMessage}
+        </p>
+      </div>
+    )}
+  </div>
+)}
+
 
                 {/* Step 2: Configure Options */}
                 {currentStep === 2 && (
