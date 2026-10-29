@@ -1,6 +1,5 @@
-import { Copy, Download, Check, Sparkles, Share2 } from 'lucide-react';
-import { Button, Card, useToast } from '../ui';
-import { useState } from 'react';
+import { Download, Sparkles, Share2 } from 'lucide-react';
+import { Button, Card, CopyButton, useToast } from '../ui';
 
 interface ProfileExportActionsProps {
   content: string;
@@ -13,14 +12,7 @@ export const ProfileExportActions = ({
   username,
   isGenerating = false,
 }: ProfileExportActionsProps) => {
-  const [copied, setCopied] = useState(false);
   const { showToast } = useToast();
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleDownload = () => {
     const blob = new Blob([content], { type: 'text/markdown' });
@@ -40,11 +32,11 @@ export const ProfileExportActions = ({
           text: content,
         });
       } else {
-        await handleCopy();
+        await navigator.clipboard.writeText(content);
         showToast('Share not supported in this browser. Copied to clipboard instead!', 'success');
       }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
+    } catch (err: unknown) {
+      if ((err as Error)?.name !== 'AbortError') {
         showToast('Failed to share content', 'error');
       }
     }
@@ -88,26 +80,13 @@ export const ProfileExportActions = ({
       <div className="p-4 bg-wharf-surface-primary">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2 mb-6">
           {/* Copy Button */}
-          <Button
-            size="sm"
-            variant={copied ? 'success' : 'yellow'}
-            onClick={handleCopy}
-            className="relative group transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-2 w-full justify-center">
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span className="font-mono text-xs font-bold">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4 group-hover:rotate-[-5deg] transition-transform" />
-                  <span className="font-mono text-xs font-bold">Copy</span>
-                </>
-              )}
-            </div>
-          </Button>
+          <CopyButton
+            content={content}
+            variant="button"
+            idleVariant="yellow"
+            label="Copy"
+            className="w-full justify-center"
+          />
 
           {/* Download Button */}
           <Button

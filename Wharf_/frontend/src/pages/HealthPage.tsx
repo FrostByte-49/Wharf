@@ -28,6 +28,7 @@ import {
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { getPopularExample } from '../data/popularExamplesData';
 
 interface HealthData {
   score: number;
@@ -410,6 +411,15 @@ export const HealthPage = () => {
                       onAnalyze={() => handleAnalyze()}
                       isLoading={isLoading}
                       apiError={error}
+                      onSelectExample={(exampleName) => {
+                        const popular = getPopularExample(exampleName);
+                        if (popular) {
+                          setRepoUrl(popular.repoData.url);
+                          setAnalyzedRepoUrl(popular.repoData.url);
+                          setHealthData(popular.healthData);
+                          setCurrentStep(2);
+                        }
+                      }}
                     />
                   </div>
                 )}

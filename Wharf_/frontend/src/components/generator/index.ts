@@ -7,3 +7,4 @@ export { GenerationProgress } from './GenerationProgress';
 export { ReadmePreview } from './ReadmePreview';
 export { ExportActions } from './ExportActions';
 export { GenerationHistory } from './GenerationHistory';
+export { CopyButton } from '../ui/CopyButton';

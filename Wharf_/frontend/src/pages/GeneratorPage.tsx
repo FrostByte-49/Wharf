@@ -477,9 +477,9 @@ export const GeneratorPage = () => {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Generation failed:', error);
-      const errMsg = error.message || 'README Generation Failed. Please Try Again.';
+      const errMsg = (error as Error)?.message || 'README Generation Failed. Please Try Again.';
       const titleCasedMsg = errMsg.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
       showToast(titleCasedMsg, 'error');
       setCurrentStep(2);
@@ -760,9 +760,15 @@ export const GeneratorPage = () => {
                     </div>
                     <RepoImportSection
                       user={user}
-                      onRepoSelect={(repo) => {
+                      onRepoSelect={(repo, sampleReadme) => {
                         setSelectedRepo(repo);
-                        setCurrentStep(2);
+                        if (sampleReadme) {
+                          setGeneratedReadme(sampleReadme);
+                          setCurrentStep(3);
+                          showToast(`Loaded sample README for ${repo.owner}/${repo.repo}!`, 'success');
+                        } else {
+                          setCurrentStep(2);
+                        }
                       }}
                     />
                   </div>

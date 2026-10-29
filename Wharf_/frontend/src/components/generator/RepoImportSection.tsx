@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link2, ArrowRight, Zap, AlertCircle, CheckCircle } from 'lucide-react';
+import { Link2, ArrowRight, Zap, AlertCircle, CheckCircle, Star } from 'lucide-react';
 import { FaGithub } from 'react-icons/fa';
 import { Badge, Button, Card, Input } from '../ui';
 import { RepoSelector } from './RepoSelector';
 import api from '../../lib/api';
+import { getPopularExample } from '../../data/popularExamplesData';
 
 export interface RepoData {
   url: string;
@@ -18,7 +19,7 @@ export interface RepoData {
 
 interface RepoImportSectionProps {
   user: { id: string; name?: string; email?: string; username?: string } | null;
-  onRepoSelect: (repo: RepoData) => void;
+  onRepoSelect: (repo: RepoData, sampleReadme?: string) => void;
 }
 
 export const RepoImportSection = ({ user, onRepoSelect }: RepoImportSectionProps) => {
@@ -137,6 +138,14 @@ export const RepoImportSection = ({ user, onRepoSelect }: RepoImportSectionProps
   };
 
   const handleExampleClick = (example: string) => {
+    const popular = getPopularExample(example);
+    if (popular) {
+      setRepoUrl(popular.repoData.url);
+      setApiError(null);
+      setTouched(true);
+      onRepoSelect(popular.repoData, popular.sampleReadme);
+      return;
+    }
     const url = `https://github.com/${example}`;
     setRepoUrl(url);
     setApiError(null);
@@ -345,6 +354,12 @@ export const RepoImportSection = ({ user, onRepoSelect }: RepoImportSectionProps
                           <p className="font-mono text-[10px] text-wharf-text-tertiary mt-0.5 capitalize">
                             {example.description}
                           </p>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2 shrink-0">
+                          <Star className="w-3 h-3 text-wharf-yellow-dark fill-wharf-yellow" />
+                          <span className="font-mono text-[10px] text-wharf-text-tertiary">
+                            {example.stars}
+                          </span>
                         </div>
                       </div>
                       <div className="absolute inset-0 border-2 border-transparent group-hover:border-wharf-pink/20 rounded-xl transition-colors pointer-events-none" />
